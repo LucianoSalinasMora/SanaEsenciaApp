@@ -3,10 +3,10 @@ package com.sanaesencia.app.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.sanaesencia.app.data.UserEntity
-import com.sanaesencia.app.data.UserRepository
-import com.sanaesencia.app.data.UserRole
-import com.sanaesencia.app.data.Validators
+import com.sanaesencia.app.data.model.UserEntity
+import com.sanaesencia.app.data.repository.UserRepository
+import com.sanaesencia.app.data.model.UserRole
+import com.sanaesencia.app.data.util.Validators
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

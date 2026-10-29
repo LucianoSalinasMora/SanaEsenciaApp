@@ -3,10 +3,10 @@ package com.sanaesencia.app.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.sanaesencia.app.data.AppointmentEntity
-import com.sanaesencia.app.data.AppointmentRepository
-import com.sanaesencia.app.data.UserEntity
-import com.sanaesencia.app.data.mockProfessionals
+import com.sanaesencia.app.data.model.AppointmentEntity
+import com.sanaesencia.app.data.repository.AppointmentRepository
+import com.sanaesencia.app.data.model.UserEntity
+import com.sanaesencia.app.data.model.mockProfessionals
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

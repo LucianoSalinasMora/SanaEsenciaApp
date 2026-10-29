@@ -3,8 +3,8 @@ package com.sanaesencia.app.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.sanaesencia.app.data.ProductEntity
-import com.sanaesencia.app.data.ProductRepository
+import com.sanaesencia.app.data.model.ProductEntity
+import com.sanaesencia.app.data.repository.ProductRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
