@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
@@ -145,11 +146,43 @@ fun MainScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo),
-                        contentDescription = "Logo Sanaesencia",
-                        modifier = Modifier.height(36.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo),
+                            contentDescription = "Logo Sanaesencia",
+                            modifier = Modifier.height(36.dp)
+                        )
+                        if (userRole == UserRole.ADMIN.name || userRole == UserRole.PROFESIONAL.name) {
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (userRole == UserRole.ADMIN.name)
+                                    MaterialTheme.colorScheme.errorContainer
+                                else
+                                    MaterialTheme.colorScheme.tertiaryContainer,
+                                tonalElevation = 2.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (userRole == UserRole.ADMIN.name) Icons.Default.ManageAccounts else Icons.Default.MedicalServices,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = if (userRole == UserRole.ADMIN.name) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (userRole == UserRole.ADMIN.name) "ADMIN" else "PROFESIONAL",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (userRole == UserRole.ADMIN.name) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
                 },
                 actions = {
                     // Campana de Notificaciones sólo visible para PACIENTE
@@ -219,13 +252,6 @@ fun MainScreen(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Agendar Cita")
                 }
-            } else if (userRole == UserRole.PROFESIONAL.name) {
-                FloatingActionButton(
-                    onClick = { parentNavController.navigate(Screen.Booking.route) },
-                    containerColor = MaterialTheme.colorScheme.tertiary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Agendar Paciente")
-                }
             }
         }
     ) { paddingValues ->
@@ -242,6 +268,7 @@ fun MainScreen(
             composable(Screen.Inicio.route) {
                 DashboardScreen(
                     viewModel = bookingViewModel,
+                    userViewModel = userViewModel,
                     role = userRole
                 )
             }
@@ -265,7 +292,8 @@ fun MainScreen(
             // Vistas de Profesional
             composable(Screen.MyPatients.route) {
                 MyPatientsScreen(
-                    bookingViewModel = bookingViewModel
+                    bookingViewModel = bookingViewModel,
+                    userViewModel = userViewModel
                 )
             }
             composable(Screen.MySchedule.route) { MyScheduleScreen(bookingViewModel = bookingViewModel, userViewModel = userViewModel) }

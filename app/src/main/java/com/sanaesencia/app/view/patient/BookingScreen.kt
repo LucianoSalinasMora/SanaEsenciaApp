@@ -516,6 +516,8 @@ fun BookingScreen(
             Button(
                 onClick = {
                     bookingViewModel.submitBooking(
+                        patient = currentUser,
+                        dbProfessionals = dbProfessionals,
                         onSuccess = { appointment ->
                             onBookingSuccess(appointment)
                         },
@@ -548,9 +550,11 @@ fun BookingScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                        val formattedDate = formatter.format(Date(millis))
-                        bookingViewModel.onDateChanged(formattedDate, dbProfessionals)
+                        // selectedDateMillis viene en UTC medianoche; se interpreta en UTC para evitar desfase de día
+                        val selectedDate = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneId.of("UTC"))
+                            .toLocalDate()
+                        bookingViewModel.onDateChanged(selectedDate.toString(), dbProfessionals)
                     }
                     showDatePicker = false
                 }) {
@@ -574,7 +578,7 @@ object DateValidators {
     val weekdayOnlyValidator = object : SelectableDates {
         override fun isSelectableDate(utcTimeMillis: Long): Boolean {
             val date = Instant.ofEpochMilli(utcTimeMillis)
-                .atZone(ZoneId.systemDefault())
+                .atZone(ZoneId.of("UTC"))
                 .toLocalDate()
 
             val isPast = date.isBefore(LocalDate.now())

@@ -100,26 +100,5 @@ fun ServiciosCatalogoScreen(
             }
         }
 
-        item {
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("Productos de Bienestar y Aromaterapia", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "Línea propia Sanaesencia: kits, roll-ons y brumas de aromaterapia disponibles para pacientes.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    OutlinedButton(
-                        onClick = onVerProductos,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Ver Catálogo de Productos")
-                    }
-                }
-            }
-        }
     }
 }

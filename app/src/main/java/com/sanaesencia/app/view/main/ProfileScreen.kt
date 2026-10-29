@@ -11,11 +11,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.sanaesencia.app.data.model.UserRole
+import com.sanaesencia.app.data.model.isCancelled
 import com.sanaesencia.app.data.util.Validators
 import com.sanaesencia.app.view.components.AppointmentCard
 import com.sanaesencia.app.viewmodel.BookingViewModel
 import com.sanaesencia.app.viewmodel.UserViewModel
+import java.time.LocalDate
 
 // ==========================================
 // Pantalla de Perfil de Usuario y Datos Personales
@@ -28,6 +33,39 @@ fun ProfileScreen(
     val context = LocalContext.current
     val currentUser by userViewModel.currentUser.collectAsState()
     val appointments by bookingViewModel.appointments.collectAsState()
+
+    val visibleAppointments = remember(appointments, currentUser) {
+        val user = currentUser
+        if (user == null) emptyList()
+        else {
+            val roleFiltered = when (user.role) {
+                UserRole.PACIENTE -> appointments.filter { appt ->
+                    (user.run.isNotBlank() && appt.patientRun.equals(user.run, ignoreCase = true)) ||
+                    (user.email.isNotBlank() && appt.patientEmail.equals(user.email, ignoreCase = true)) ||
+                    (user.name.isNotBlank() && appt.patientName.equals(user.name, ignoreCase = true))
+                }
+                UserRole.PROFESIONAL -> appointments.filter { appt ->
+                    appt.professionalName.equals(user.name, ignoreCase = true) ||
+                    (user.run.isNotBlank() && appt.professionalRun.equals(user.run, ignoreCase = true))
+                }
+                UserRole.ADMIN -> appointments
+            }
+
+            val today = LocalDate.now()
+            roleFiltered.filter { appt ->
+                if (!appt.isCancelled) {
+                    true
+                } else {
+                    try {
+                        val apptDate = LocalDate.parse(appt.date)
+                        !apptDate.plusDays(1).isBefore(today)
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+            }.sortedWith(compareBy({ it.date }, { it.timeSlot }))
+        }
+    }
 
     var isEditing by remember { mutableStateOf(false) }
     var name by remember(currentUser) { mutableStateOf(currentUser?.name ?: "") }
@@ -67,7 +105,50 @@ fun ProfileScreen(
                             Column {
                                 Text(currentUser?.name ?: "Usuario", style = MaterialTheme.typography.titleMedium)
                                 Text("RUN: ${currentUser?.run ?: "N/A"}", style = MaterialTheme.typography.bodySmall)
-                                Text("Rol: ${currentUser?.role?.name ?: "PACIENTE"}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = when (currentUser?.role) {
+                                        UserRole.ADMIN -> MaterialTheme.colorScheme.errorContainer
+                                        UserRole.PROFESIONAL -> MaterialTheme.colorScheme.tertiaryContainer
+                                        else -> MaterialTheme.colorScheme.secondaryContainer
+                                    }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = when (currentUser?.role) {
+                                                UserRole.ADMIN -> Icons.Default.ManageAccounts
+                                                UserRole.PROFESIONAL -> Icons.Default.MedicalServices
+                                                else -> Icons.Default.Person
+                                            },
+                                            contentDescription = null,
+                                            modifier = Modifier.size(12.dp),
+                                            tint = when (currentUser?.role) {
+                                                UserRole.ADMIN -> MaterialTheme.colorScheme.onErrorContainer
+                                                UserRole.PROFESIONAL -> MaterialTheme.colorScheme.onTertiaryContainer
+                                                else -> MaterialTheme.colorScheme.onSecondaryContainer
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = when (currentUser?.role) {
+                                                UserRole.ADMIN -> "ADMINISTRADOR"
+                                                UserRole.PROFESIONAL -> "PROFESIONAL"
+                                                else -> "PACIENTE"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = when (currentUser?.role) {
+                                                UserRole.ADMIN -> MaterialTheme.colorScheme.onErrorContainer
+                                                UserRole.PROFESIONAL -> MaterialTheme.colorScheme.onTertiaryContainer
+                                                else -> MaterialTheme.colorScheme.onSecondaryContainer
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                         IconButton(onClick = { isEditing = !isEditing }) {
@@ -141,12 +222,12 @@ fun ProfileScreen(
             Text("Historial de Citas Registradas", style = MaterialTheme.typography.titleLarge)
         }
 
-        if (appointments.isEmpty()) {
+        if (visibleAppointments.isEmpty()) {
             item {
                 Text("No hay registros de citas guardadas.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
             }
         } else {
-            items(appointments) { appointment ->
+            items(visibleAppointments) { appointment ->
                 AppointmentCard(
                     appointment = appointment,
                     onCancel = {

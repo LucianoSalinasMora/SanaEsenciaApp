@@ -151,6 +151,8 @@ class BookingViewModel(private val repository: AppointmentRepository) : ViewMode
     // Confirmación y Envío de la Cita Médica
     // ------------------------------------------
     fun submitBooking(
+        patient: UserEntity? = null,
+        dbProfessionals: List<UserEntity> = emptyList(),
         onSuccess: (AppointmentEntity) -> Unit,
         onError: ((String) -> Unit)? = null
     ) {
@@ -178,11 +180,18 @@ class BookingViewModel(private val repository: AppointmentRepository) : ViewMode
             val freeBoxes = (1..8).filter { it !in occupiedBoxes }
             val assignedBox = if (state.isOnline) null else (freeBoxes.firstOrNull() ?: (1..8).random())
 
+            val resolvedPatientRun = state.patientRun.ifBlank { patient?.run.orEmpty() }
+            val resolvedPatientName = state.patientName.ifBlank { patient?.name ?: "Paciente Registrado" }
+            val resolvedPatientEmail = state.patientEmail.ifBlank { patient?.email.orEmpty() }
+            val resolvedPatientPhone = state.patientPhone.ifBlank { patient?.phone.orEmpty() }
+            val resolvedProRun = dbProfessionals.find { it.name.equals(state.professionalName, ignoreCase = true) }?.run.orEmpty()
+
             val entity = AppointmentEntity(
-                patientName = state.patientName.ifBlank { "Paciente Registrado" },
-                patientEmail = state.patientEmail,
-                patientPhone = state.patientPhone,
-                patientRun = state.patientRun,
+                patientName = resolvedPatientName,
+                patientEmail = resolvedPatientEmail,
+                patientPhone = resolvedPatientPhone,
+                patientRun = resolvedPatientRun,
+                professionalRun = resolvedProRun,
                 serviceType = state.serviceType,
                 professionalName = state.professionalName,
                 date = state.date,

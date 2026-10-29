@@ -30,9 +30,19 @@ fun MyScheduleScreen(
     val currentUser by userViewModel.currentUser.collectAsState()
 
     val hoy = LocalDate.now().toString() // formato yyyy-MM-dd, igual que las citas
-    val proximas = allAppointments
-        .filter { it.professionalName == currentUser?.name && it.date >= hoy }
-        .sortedWith(compareBy({ it.date }, { it.timeSlot }))
+    val proximas = remember(allAppointments, currentUser, hoy) {
+        val user = currentUser
+        if (user == null) emptyList()
+        else {
+            allAppointments
+                .filter {
+                    (it.professionalName.equals(user.name, ignoreCase = true) ||
+                     (user.run.isNotBlank() && it.professionalRun.equals(user.run, ignoreCase = true))) &&
+                    it.date >= hoy
+                }
+                .sortedWith(compareBy({ it.date }, { it.timeSlot }))
+        }
+    }
 
     Column(
         modifier = Modifier
