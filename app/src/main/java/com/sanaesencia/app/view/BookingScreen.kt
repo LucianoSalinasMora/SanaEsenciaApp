@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.sanaesencia.app.data.AppointmentEntity
 import com.sanaesencia.app.data.LocationHelper
+import com.sanaesencia.app.data.formatDisplayDate
 import com.sanaesencia.app.data.isCancelled
 import com.sanaesencia.app.data.mockProfessionals
 import com.sanaesencia.app.viewmodel.BookingViewModel
@@ -119,6 +120,11 @@ fun BookingScreen(
         bookingViewModel.loadPatientData(currentUser)
     }
 
+    // Limpiar campo de información relevante / antecedentes al iniciar agendamiento
+    LaunchedEffect(Unit) {
+        bookingViewModel.onNotesChanged("")
+    }
+
     var showDatePicker by remember { mutableStateOf(false) }
 
     // Lista de Áreas / Especialidades del Centro
@@ -150,13 +156,13 @@ fun BookingScreen(
 
     // Filtrar profesionales disponibles según la especialidad seleccionada
     val availableProfessionals = remember(state.serviceType, dbProfessionals) {
-        getProfessionalsForArea(state.serviceType)
+        if (state.serviceType.isBlank()) emptyList() else getProfessionalsForArea(state.serviceType)
     }
 
-    // Preseleccionar automáticamente el primer profesional del área si el actual no pertenece a la misma
-    LaunchedEffect(state.serviceType, availableProfessionals) {
-        if (availableProfessionals.isNotEmpty() && state.professionalName !in availableProfessionals) {
-            bookingViewModel.onProfessionalChanged(availableProfessionals.first(), dbProfessionals)
+    // Si el profesional seleccionado no pertenece al área actual, limpiarlo para mantener placeholder
+    LaunchedEffect(state.serviceType) {
+        if (state.professionalName.isNotBlank() && state.professionalName !in availableProfessionals) {
+            bookingViewModel.onProfessionalChanged("", dbProfessionals)
         }
     }
 
@@ -288,6 +294,7 @@ fun BookingScreen(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Área de Atención") },
+                    placeholder = { Text("Seleccione un área de atención") },
                     leadingIcon = { Icon(Icons.Default.MedicalServices, contentDescription = null) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = areaExpanded) },
                     modifier = Modifier.menuAnchor().fillMaxWidth()
@@ -300,9 +307,7 @@ fun BookingScreen(
                         DropdownMenuItem(
                             text = { Text(area) },
                             onClick = {
-                                val pros = getProfessionalsForArea(area)
-                                val firstPro = pros.firstOrNull() ?: ""
-                                bookingViewModel.onAreaChanged(area, firstPro, dbProfessionals)
+                                bookingViewModel.onAreaChanged(area, "", dbProfessionals)
                                 areaExpanded = false
                             }
                         )
@@ -314,29 +319,41 @@ fun BookingScreen(
             Text("2. Profesional del Área", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             ExposedDropdownMenuBox(
                 expanded = proExpanded,
-                onExpandedChange = { proExpanded = !proExpanded }
+                onExpandedChange = { if (state.serviceType.isNotBlank()) proExpanded = !proExpanded }
             ) {
                 OutlinedTextField(
                     value = state.professionalName,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Profesional Atendiente") },
+                    placeholder = {
+                        Text(if (state.serviceType.isBlank()) "Primero seleccione un área de atención" else "Seleccione un profesional del área")
+                    },
                     leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = proExpanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    enabled = state.serviceType.isNotBlank()
                 )
                 ExposedDropdownMenu(
                     expanded = proExpanded,
                     onDismissRequest = { proExpanded = false }
                 ) {
-                    availableProfessionals.forEach { proName ->
+                    if (availableProfessionals.isEmpty()) {
                         DropdownMenuItem(
-                            text = { Text(proName) },
-                            onClick = {
-                                bookingViewModel.onProfessionalChanged(proName, dbProfessionals)
-                                proExpanded = false
-                            }
+                            text = { Text("No hay profesionales disponibles") },
+                            onClick = { proExpanded = false },
+                            enabled = false
                         )
+                    } else {
+                        availableProfessionals.forEach { proName ->
+                            DropdownMenuItem(
+                                text = { Text(proName) },
+                                onClick = {
+                                    bookingViewModel.onProfessionalChanged(proName, dbProfessionals)
+                                    proExpanded = false
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -344,10 +361,11 @@ fun BookingScreen(
             // 3. SELECCIÓN DE FECHA
             Text("3. Fecha de Atención", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             OutlinedTextField(
-                value = state.date,
+                value = formatDisplayDate(state.date),
                 onValueChange = { },
                 readOnly = true,
                 label = { Text("Seleccionar Fecha en Calendario") },
+                placeholder = { Text("DD/MM/AAAA") },
                 leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -357,7 +375,8 @@ fun BookingScreen(
                     disabledTextColor = MaterialTheme.colorScheme.onSurface,
                     disabledBorderColor = MaterialTheme.colorScheme.outline,
                     disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
 

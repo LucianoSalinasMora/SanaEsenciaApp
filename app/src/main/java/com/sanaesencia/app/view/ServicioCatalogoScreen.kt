@@ -112,12 +112,6 @@ fun ServiciosCatalogoScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.secondary
                     )
-                    OutlinedButton(
-                        onClick = onVerProductos,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Ver Catálogo de Productos")
-                    }
                 }
             }
         }

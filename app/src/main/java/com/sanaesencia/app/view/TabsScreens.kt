@@ -29,13 +29,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import com.sanaesencia.app.R
 import com.sanaesencia.app.data.AppointmentEntity
-import com.sanaesencia.app.data.isCancelled
 import com.sanaesencia.app.data.ContactHelper
 import com.sanaesencia.app.data.NosotrosManager
 import com.sanaesencia.app.data.NotificationHelper
 import com.sanaesencia.app.data.UserEntity
 import com.sanaesencia.app.data.UserRole
 import com.sanaesencia.app.data.Validators
+import com.sanaesencia.app.data.formatDisplayDate
+import com.sanaesencia.app.data.isCancelled
 import com.sanaesencia.app.data.mockProfessionals
 import com.sanaesencia.app.viewmodel.BookingViewModel
 import com.sanaesencia.app.viewmodel.UserViewModel
@@ -291,7 +292,7 @@ fun AppointmentCard(
             },
             text = {
                 Text(
-                    text = "¿Estás seguro de que deseas cancelar la cita de ${appointment.serviceType} con ${appointment.professionalName} agendada para el ${appointment.date} a las ${appointment.timeSlot}?\n\nAl cancelarla, desaparecerá de tus citas agendadas y el horario volverá a quedar disponible para otros pacientes."
+                    text = "¿Estás seguro de que deseas cancelar la cita de ${appointment.serviceType} con ${appointment.professionalName} agendada para el ${formatDisplayDate(appointment.date)} a las ${appointment.timeSlot}?\n\nAl cancelarla, desaparecerá de tus citas agendadas y el horario volverá a quedar disponible para otros pacientes."
                 )
             },
             confirmButton = {
@@ -448,7 +449,7 @@ fun AppointmentCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Fecha: ${appointment.date}", style = MaterialTheme.typography.bodyMedium)
+                Text("Fecha: ${formatDisplayDate(appointment.date)}", style = MaterialTheme.typography.bodyMedium)
                 Spacer(modifier = Modifier.width(16.dp))
                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))

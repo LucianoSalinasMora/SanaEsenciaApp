@@ -13,6 +13,8 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.net.Uri
 import android.os.Build
+import android.provider.ContactsContract
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
@@ -20,10 +22,74 @@ import com.sanaesencia.app.MainActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+
+// ==========================================
+// Ayudante de Integración de Contacto y Mensajería
+// ==========================================
+object ContactHelper {
+
+    // ------------------------------------------
+    // Apertura e Interacción con WhatsApp
+    // ------------------------------------------
+    /**
+     * Redirige directamente a la app de WhatsApp o a su web con un mensaje predeterminado.
+     */
+    fun openWhatsApp(context: Context, rawPhone: String, message: String = "") {
+        try {
+            val cleanPhone = rawPhone
+                .replace("+", "")
+                .replace(" ", "")
+                .replace("-", "")
+                .replace("(", "")
+                .replace(")", "")
+                .trim()
+
+            val encodedMsg = if (message.isNotBlank()) URLEncoder.encode(message, "UTF-8") else ""
+            val url = if (encodedMsg.isNotBlank()) {
+                "https://api.whatsapp.com/send?phone=$cleanPhone&text=$encodedMsg"
+            } else {
+                "https://api.whatsapp.com/send?phone=$cleanPhone"
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "No se pudo abrir WhatsApp o no está instalado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ------------------------------------------
+    // Guardado Nativo en Libreta de Contactos
+    // ------------------------------------------
+    /**
+     * Abre el formulario nativo del teléfono para agregar a Centro Sanaesencia a los contactos.
+     */
+    fun addContact(
+        context: Context,
+        name: String = "Centro Sanaesencia",
+        phone: String = "+56923665073",
+        email: String = "contacto@centrosanaesencia.cl",
+        address: String = "Caupolicán 220, Los Vilos"
+    ) {
+        try {
+            val intent = Intent(Intent.ACTION_INSERT).apply {
+                type = ContactsContract.RawContacts.CONTENT_TYPE
+                putExtra(ContactsContract.Intents.Insert.NAME, name)
+                putExtra(ContactsContract.Intents.Insert.PHONE, phone)
+                putExtra(ContactsContract.Intents.Insert.EMAIL, email)
+                putExtra(ContactsContract.Intents.Insert.POSTAL, address)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "No se pudo abrir la libreta de contactos", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
 
 // ==========================================
 // Modelos y Categorías para Notificaciones
@@ -102,7 +168,6 @@ class LocationHelper(private val context: Context) {
                     val distanceInKm = distanceInMeters / 1000f
                     onResult(distanceInKm < PROXIMITY_THRESHOLD_KM, distanceInKm, null)
                 } else {
-                    // Si lastLocation es nulo (típico en emuladores o sin fijación previa), solicitamos ubicación actual
                     try {
                         fusedLocationClient.getCurrentLocation(
                             com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
@@ -144,6 +209,42 @@ class LocationHelper(private val context: Context) {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             })
         }
+    }
+}
+
+// ==========================================
+// Función de Formato de Fecha a DD/MM/AAAA
+// ==========================================
+fun formatDisplayDate(dateStr: String): String {
+    if (dateStr.isBlank()) return ""
+    return try {
+        val trimmed = dateStr.trim()
+        if (trimmed.contains("-")) {
+            val parts = trimmed.split("-")
+            if (parts.size == 3) {
+                if (parts[0].length == 4) {
+                    // yyyy-MM-dd -> DD/MM/AAAA
+                    val year = parts[0]
+                    val month = parts[1].padStart(2, '0')
+                    val day = parts[2].padStart(2, '0')
+                    "$day/$month/$year"
+                } else if (parts[2].length == 4) {
+                    // dd-MM-yyyy -> DD/MM/AAAA
+                    val day = parts[0].padStart(2, '0')
+                    val month = parts[1].padStart(2, '0')
+                    val year = parts[2]
+                    "$day/$month/$year"
+                } else {
+                    trimmed
+                }
+            } else {
+                trimmed
+            }
+        } else {
+            trimmed
+        }
+    } catch (_: Exception) {
+        dateStr
     }
 }
 
@@ -251,7 +352,8 @@ class NotificationHelper(private val context: Context) {
     // ------------------------------------------
     fun sendBookingNotification(serviceName: String, date: String, timeSlot: String = "") {
         val title = "Cita Confirmada - Sanaesencia"
-        val message = "Tu hora para $serviceName ha sido agendada con éxito para el $date${if (timeSlot.isNotBlank()) " a las $timeSlot" else ""}."
+        val formattedDate = formatDisplayDate(date)
+        val message = "Tu hora para $serviceName ha sido agendada con éxito para el $formattedDate${if (timeSlot.isNotBlank()) " a las $timeSlot" else ""}."
 
         addNotificationToState(title, message, NotificationCategory.CONFIRMATION)
 

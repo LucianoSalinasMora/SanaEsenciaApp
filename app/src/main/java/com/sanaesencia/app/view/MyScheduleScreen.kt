@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.sanaesencia.app.data.formatDisplayDate
 import com.sanaesencia.app.viewmodel.BookingViewModel
 import com.sanaesencia.app.viewmodel.UserViewModel
 import java.time.LocalDate
@@ -81,7 +82,7 @@ fun MyScheduleScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(cita.date, style = MaterialTheme.typography.bodyMedium)
+                                Text(formatDisplayDate(cita.date), style = MaterialTheme.typography.bodyMedium)
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
