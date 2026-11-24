@@ -9,6 +9,25 @@ android {
     namespace = "com.sanaesencia.app"
     compileSdk = 35
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("app/sanaescencia.jks") // Si está dentro de app/. Si está en la raíz, usa file("../mi_llave.jks")
+            storePassword = "sanaescencia123"
+            keyAlias = "sanaescencia"
+            keyPassword = "sanaescencia123"
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
     defaultConfig {
         applicationId = "com.sanaesencia.app"
         minSdk = 26
