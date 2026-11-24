@@ -65,3 +65,45 @@ val seedUsers: List<UserEntity> = listOf(
         securityAnswer = "prueba"
     )
 )
+
+// ==========================================
+// Datos Semilla de Boxes de Atención Presencial (1 al 8)
+// ==========================================
+val seedBoxes: List<BoxEntity> = (1..8).map { num ->
+    BoxEntity(
+        boxNumber = num,
+        name = "Box $num",
+        status = "disponible",
+        description = "Box de atención presencial $num - Sede Los Vilos"
+    )
+}
+
+// ==========================================
+// Generador de Turnos Semilla para Profesionales del Centro
+// ==========================================
+fun generateSeedTurnos(): List<TurnoEntity> {
+    val turnos = mutableListOf<TurnoEntity>()
+    val timeSlots = listOf("09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "15:00 PM", "16:00 PM", "17:00 PM")
+    val pros = seedUsers.filter { it.role == UserRole.PROFESIONAL }
+    val today = java.time.LocalDate.now()
+
+    pros.take(6).forEachIndexed { proIdx, pro ->
+        val assignedBox = (proIdx % 8) + 1
+        timeSlots.forEach { slot ->
+            // Generar turnos en los próximos días
+            val dateStr = today.plusDays((proIdx % 3).toLong()).toString()
+            turnos.add(
+                TurnoEntity(
+                    date = dateStr,
+                    timeSlot = slot,
+                    professionalRun = pro.run,
+                    professionalName = pro.name,
+                    serviceType = pro.specialty,
+                    boxNumber = assignedBox,
+                    status = "disponible"
+                )
+            )
+        }
+    }
+    return turnos
+}

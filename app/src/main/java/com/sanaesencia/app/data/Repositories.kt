@@ -1,6 +1,7 @@
 package com.sanaesencia.app.data
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 // ==========================================
 // Repositorio de Información Institucional "Nosotros"
@@ -23,19 +24,83 @@ class AboutRepository(private val aboutDao: AboutDao) {
 // ==========================================
 // Repositorio para la Gestión de Citas
 // ==========================================
-class AppointmentRepository(private val appointmentDao: AppointmentDao) {
+class AppointmentRepository(
+    private val appointmentDao: AppointmentDao,
+    private val boxDao: BoxDao? = null,
+    private val turnoDao: TurnoDao? = null
+) {
+    private val resolvedBoxDao: BoxDao?
+        get() = boxDao ?: AppDatabase.getInstance()?.boxDao()
+
+    private val resolvedTurnoDao: TurnoDao?
+        get() = turnoDao ?: AppDatabase.getInstance()?.turnoDao()
 
     // ------------------------------------------
     // Flujo Reactivo de Todas las Citas
     // ------------------------------------------
     val allAppointments: Flow<List<AppointmentEntity>> = appointmentDao.getAllAppointments()
+    val allBoxes: Flow<List<BoxEntity>>
+        get() = resolvedBoxDao?.getAllBoxes() ?: flowOf(emptyList())
+    val allTurnos: Flow<List<TurnoEntity>>
+        get() = resolvedTurnoDao?.getAllTurnos() ?: flowOf(emptyList())
+
+    // ------------------------------------------
+    // Inicialización y Sembrado de Boxes y Turnos
+    // ------------------------------------------
+    suspend fun seedInitialBoxesAndTurnos() {
+        try {
+            resolvedBoxDao?.let { bDao ->
+                if (bDao.getBoxCount() == 0) {
+                    bDao.insertBoxes(seedBoxes)
+                }
+            }
+            resolvedTurnoDao?.let { tDao ->
+                if (tDao.getTurnoCount() == 0) {
+                    tDao.insertTurnos(generateSeedTurnos())
+                }
+            }
+        } catch (_: Exception) {}
+    }
 
     // ------------------------------------------
     // Guardar / Registrar Nueva Cita
     // ------------------------------------------
     suspend fun saveAppointment(appointment: AppointmentEntity): Boolean {
         return try {
-            appointmentDao.insertAppointment(appointment)
+            val insertedId = appointmentDao.insertAppointment(appointment)
+
+            // Si es presencial y tiene box asignado, actualizar estado del Box a 'reservado'
+            if (!appointment.isOnline && appointment.boxNumber != null) {
+                resolvedBoxDao?.updateBoxStatus(appointment.boxNumber, "reservado", insertedId)
+            }
+
+            // Actualizar o crear turno asociado en estado 'reservado'
+            val existingTurno = resolvedTurnoDao?.findTurno(appointment.date, appointment.professionalName, appointment.timeSlot)
+            if (existingTurno != null) {
+                resolvedTurnoDao?.updateTurnoStatus(existingTurno.id, "reservado", insertedId)
+            } else {
+                resolvedTurnoDao?.insertTurno(
+                    TurnoEntity(
+                        date = appointment.date,
+                        timeSlot = appointment.timeSlot,
+                        professionalRun = appointment.professionalRun,
+                        professionalName = appointment.professionalName,
+                        serviceType = appointment.serviceType,
+                        boxNumber = appointment.boxNumber,
+                        status = "reservado",
+                        isOnline = appointment.isOnline,
+                        appointmentId = insertedId
+                    )
+                )
+            }
+
+            // Sincronización con backend microservicio Spring Boot (Offline-First)
+            try {
+                RetrofitClient.backendApi.createAppointment(appointment.copy(id = insertedId).toDto())
+            } catch (_: Exception) {
+                // Operación local en Room preservada exitosamente si no hay conexión externa
+            }
+
             true
         } catch (e: Exception) {
             false
@@ -57,14 +122,42 @@ class AppointmentRepository(private val appointmentDao: AppointmentDao) {
     }
 
     // ------------------------------------------
+    // Consumo de API Externa: Clima en tiempo real Los Vilos
+    // ------------------------------------------
+    suspend fun getLosVilosWeather(): CurrentWeatherDto? {
+        return try {
+            val response = RetrofitClient.weatherApi.getWeather()
+            if (response.isSuccessful) response.body()?.current_weather else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    // ------------------------------------------
     // Cancelación y Eliminación de Citas
     // ------------------------------------------
     suspend fun cancelAppointment(id: Long) {
         appointmentDao.updateAppointmentState(id, "CANCELADA", "Cancelada")
+        // Liberar box asociado a la cita
+        resolvedBoxDao?.releaseBoxByAppointmentId(id)
+        // Liberar turno asociado a la cita
+        resolvedTurnoDao?.releaseTurnoByAppointmentId(id)
+
+        // Notificar al microservicio Spring Boot
+        try {
+            RetrofitClient.backendApi.cancelAppointment(id)
+        } catch (_: Exception) {}
     }
 
     suspend fun deleteAppointment(id: Long) {
+        resolvedBoxDao?.releaseBoxByAppointmentId(id)
+        resolvedTurnoDao?.releaseTurnoByAppointmentId(id)
         appointmentDao.deleteAppointment(id)
+
+        // Notificar al microservicio Spring Boot
+        try {
+            RetrofitClient.backendApi.deleteAppointment(id)
+        } catch (_: Exception) {}
     }
 }
 
@@ -230,5 +323,82 @@ class UserRepository(private val userDao: UserDao) {
         val formattedRun = cleanRun.replace(".", "").replace("-", "").uppercase()
         userDao.updatePassword(cleanRun, newPassword)
         userDao.updatePassword(formattedRun, newPassword)
+    }
+}
+
+// ==========================================
+// Repositorio para la Gestión de Boxes de Atención
+// ==========================================
+class BoxRepository(private val boxDao: BoxDao) {
+
+    val allBoxes: Flow<List<BoxEntity>> = boxDao.getAllBoxes()
+    val availableBoxes: Flow<List<BoxEntity>> = boxDao.getAvailableBoxes()
+
+    suspend fun seedInitialBoxes() {
+        if (boxDao.getBoxCount() == 0) {
+            boxDao.insertBoxes(seedBoxes)
+        }
+    }
+
+    suspend fun getBoxByNumber(boxNumber: Int): BoxEntity? {
+        return boxDao.getBoxByNumber(boxNumber)
+    }
+
+    suspend fun reserveBox(boxNumber: Int, appointmentId: Long? = null) {
+        boxDao.updateBoxStatus(boxNumber, "reservado", appointmentId)
+    }
+
+    suspend fun releaseBox(boxNumber: Int) {
+        boxDao.updateBoxStatus(boxNumber, "disponible", null)
+    }
+
+    suspend fun updateBoxStatus(boxNumber: Int, status: String) {
+        boxDao.updateBoxStatus(boxNumber, status)
+    }
+}
+
+// ==========================================
+// Repositorio para la Gestión de Turnos de Atención
+// ==========================================
+class TurnoRepository(private val turnoDao: TurnoDao) {
+
+    val allTurnos: Flow<List<TurnoEntity>> = turnoDao.getAllTurnos()
+
+    fun getTurnosByDate(date: String): Flow<List<TurnoEntity>> {
+        return turnoDao.getTurnosByDate(date)
+    }
+
+    fun getTurnosByProfessional(professionalRun: String): Flow<List<TurnoEntity>> {
+        return turnoDao.getTurnosByProfessional(professionalRun)
+    }
+
+    fun getAvailableTurnos(date: String): Flow<List<TurnoEntity>> {
+        return turnoDao.getAvailableTurnos(date)
+    }
+
+    suspend fun seedInitialTurnos() {
+        if (turnoDao.getTurnoCount() == 0) {
+            turnoDao.insertTurnos(generateSeedTurnos())
+        }
+    }
+
+    suspend fun insertTurno(turno: TurnoEntity): Long {
+        return turnoDao.insertTurno(turno)
+    }
+
+    suspend fun updateTurno(turno: TurnoEntity) {
+        turnoDao.updateTurno(turno)
+    }
+
+    suspend fun reserveTurno(turnoId: Long, appointmentId: Long) {
+        turnoDao.updateTurnoStatus(turnoId, "reservado", appointmentId)
+    }
+
+    suspend fun releaseTurno(turnoId: Long) {
+        turnoDao.updateTurnoStatus(turnoId, "disponible", null)
+    }
+
+    suspend fun releaseTurnoByAppointment(appointmentId: Long) {
+        turnoDao.releaseTurnoByAppointmentId(appointmentId)
     }
 }

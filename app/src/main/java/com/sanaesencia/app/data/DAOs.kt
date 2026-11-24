@@ -193,3 +193,83 @@ interface UserDao {
     @Query("UPDATE users SET passwordHash = :newPassword WHERE run = :run")
     suspend fun updatePassword(run: String, newPassword: String)
 }
+
+// ==========================================
+// Interfaz DAO para Boxes de Atención Presencial
+// ==========================================
+@Dao
+interface BoxDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBox(box: BoxEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBoxes(boxes: List<BoxEntity>)
+
+    @Update
+    suspend fun updateBox(box: BoxEntity)
+
+    @Query("SELECT * FROM boxes ORDER BY boxNumber ASC")
+    fun getAllBoxes(): Flow<List<BoxEntity>>
+
+    @Query("SELECT * FROM boxes WHERE status = 'disponible' ORDER BY boxNumber ASC")
+    fun getAvailableBoxes(): Flow<List<BoxEntity>>
+
+    @Query("SELECT * FROM boxes WHERE boxNumber = :boxNumber LIMIT 1")
+    suspend fun getBoxByNumber(boxNumber: Int): BoxEntity?
+
+    @Query("UPDATE boxes SET status = :status, currentAppointmentId = :appointmentId WHERE boxNumber = :boxNumber")
+    suspend fun updateBoxStatus(boxNumber: Int, status: String, appointmentId: Long? = null)
+
+    @Query("UPDATE boxes SET status = 'disponible', currentAppointmentId = NULL WHERE currentAppointmentId = :appointmentId")
+    suspend fun releaseBoxByAppointmentId(appointmentId: Long)
+
+    @Query("SELECT COUNT(*) FROM boxes")
+    suspend fun getBoxCount(): Int
+}
+
+// ==========================================
+// Interfaz DAO para Turnos / Módulos de Atención
+// ==========================================
+@Dao
+interface TurnoDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTurno(turno: TurnoEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTurnos(turnos: List<TurnoEntity>)
+
+    @Update
+    suspend fun updateTurno(turno: TurnoEntity)
+
+    @Query("DELETE FROM turnos WHERE id = :id")
+    suspend fun deleteTurno(id: Long)
+
+    @Query("SELECT * FROM turnos ORDER BY date ASC, timeSlot ASC")
+    fun getAllTurnos(): Flow<List<TurnoEntity>>
+
+    @Query("SELECT * FROM turnos WHERE date = :date ORDER BY timeSlot ASC")
+    fun getTurnosByDate(date: String): Flow<List<TurnoEntity>>
+
+    @Query("SELECT * FROM turnos WHERE professionalRun = :professionalRun ORDER BY date ASC, timeSlot ASC")
+    fun getTurnosByProfessional(professionalRun: String): Flow<List<TurnoEntity>>
+
+    @Query("SELECT * FROM turnos WHERE date = :date AND status = 'disponible' ORDER BY timeSlot ASC")
+    fun getAvailableTurnos(date: String): Flow<List<TurnoEntity>>
+
+    @Query("SELECT * FROM turnos WHERE date = :date AND professionalName = :professionalName AND timeSlot = :timeSlot LIMIT 1")
+    suspend fun findTurno(date: String, professionalName: String, timeSlot: String): TurnoEntity?
+
+    @Query("SELECT * FROM turnos WHERE id = :id LIMIT 1")
+    suspend fun getTurnoById(id: Long): TurnoEntity?
+
+    @Query("UPDATE turnos SET status = :status, appointmentId = :appointmentId WHERE id = :id")
+    suspend fun updateTurnoStatus(id: Long, status: String, appointmentId: Long? = null)
+
+    @Query("UPDATE turnos SET status = 'disponible', appointmentId = NULL WHERE appointmentId = :appointmentId")
+    suspend fun releaseTurnoByAppointmentId(appointmentId: Long)
+
+    @Query("SELECT COUNT(*) FROM turnos")
+    suspend fun getTurnoCount(): Int
+}

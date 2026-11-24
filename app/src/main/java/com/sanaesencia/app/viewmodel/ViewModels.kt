@@ -7,8 +7,11 @@ import com.sanaesencia.app.data.AboutInfoEntity
 import com.sanaesencia.app.data.AboutRepository
 import com.sanaesencia.app.data.AppointmentEntity
 import com.sanaesencia.app.data.AppointmentRepository
+import com.sanaesencia.app.data.BoxEntity
+import com.sanaesencia.app.data.CurrentWeatherDto
 import com.sanaesencia.app.data.ProductEntity
 import com.sanaesencia.app.data.ProductRepository
+import com.sanaesencia.app.data.TurnoEntity
 import com.sanaesencia.app.data.UserEntity
 import com.sanaesencia.app.data.UserRepository
 import com.sanaesencia.app.data.UserRole
@@ -90,6 +93,36 @@ class BookingViewModel(private val repository: AppointmentRepository) : ViewMode
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    val boxes: StateFlow<List<BoxEntity>> = repository.allBoxes
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val turnos: StateFlow<List<TurnoEntity>> = repository.allTurnos
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    private val _weatherState = MutableStateFlow<CurrentWeatherDto?>(null)
+    val weatherState: StateFlow<CurrentWeatherDto?> = _weatherState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.seedInitialBoxesAndTurnos()
+            loadWeather()
+        }
+    }
+
+    fun loadWeather() {
+        viewModelScope.launch {
+            _weatherState.value = repository.getLosVilosWeather()
+        }
+    }
 
     // ------------------------------------------
     // Carga de Datos del Paciente Autenticado

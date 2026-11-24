@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sanaesencia.app.data.isCancelled
@@ -21,6 +22,7 @@ fun ManageScheduleScreen(bookingViewModel: BookingViewModel) {
     // Observación y Filtrado de Citas (Activas vs Canceladas)
     // ------------------------------------------
     val citas by bookingViewModel.appointments.collectAsState()
+    val boxes by bookingViewModel.boxes.collectAsState()
 
     var filtroSeleccionado by remember { mutableStateOf("TODAS") }
 
@@ -80,7 +82,10 @@ fun ManageScheduleScreen(bookingViewModel: BookingViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     (1..4).forEach { box ->
-                        BoxCard(box, activas.count { it.boxNumber == box }, Modifier.weight(1f))
+                        val boxEntity = boxes.find { it.boxNumber == box }
+                        val activeCount = activas.count { it.boxNumber == box }
+                        val status = if (activeCount > 0 || boxEntity?.status == "reservado") "reservado" else "disponible"
+                        BoxCard(box, activeCount, status, Modifier.weight(1f))
                     }
                 }
                 Row(
@@ -88,7 +93,10 @@ fun ManageScheduleScreen(bookingViewModel: BookingViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     (5..8).forEach { box ->
-                        BoxCard(box, activas.count { it.boxNumber == box }, Modifier.weight(1f))
+                        val boxEntity = boxes.find { it.boxNumber == box }
+                        val activeCount = activas.count { it.boxNumber == box }
+                        val status = if (activeCount > 0 || boxEntity?.status == "reservado") "reservado" else "disponible"
+                        BoxCard(box, activeCount, status, Modifier.weight(1f))
                     }
                 }
             }
@@ -195,25 +203,44 @@ private fun ResumenCard(
 // Componente de Tarjeta de Ocupación de Box
 // ==========================================
 @Composable
-private fun BoxCard(box: Int, cantidad: Int, modifier: Modifier = Modifier) {
-    ElevatedCard(modifier = modifier) {
+private fun BoxCard(
+    box: Int,
+    cantidad: Int,
+    status: String = "disponible",
+    modifier: Modifier = Modifier
+) {
+    val isReserved = status.equals("reservado", ignoreCase = true) || cantidad > 0
+    ElevatedCard(
+        modifier = modifier,
+        colors = if (isReserved) CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+        ) else CardDefaults.elevatedCardColors()
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp),
+                .padding(vertical = 10.dp, horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = "Box $box", style = MaterialTheme.typography.labelMedium)
+            Text(text = "Box $box", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(2.dp))
+            Surface(
+                color = if (isReserved) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color(0xFFE8F5E9),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = if (isReserved) "Reservado" else "Disponible",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isReserved) MaterialTheme.colorScheme.primary else Color(0xFF2E7D32),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = cantidad.toString(),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (cantidad > 0) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.outline
-            )
-            Text(
-                text = if (cantidad == 1) "cita" else "citas",
-                style = MaterialTheme.typography.labelSmall
+                text = if (cantidad == 1) "1 cita" else "$cantidad citas",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

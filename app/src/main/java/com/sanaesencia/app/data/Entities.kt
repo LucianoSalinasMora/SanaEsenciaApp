@@ -42,7 +42,9 @@ data class AppointmentEntity(
     // Estado y Notas Clínicas / de Atención
     val status: String = "Agendada",
     val state: String = "PENDIENTE",
-    val patientNotes: String = ""
+    val patientNotes: String = "",
+    // Asociación con TurnoEntity
+    val turnoId: Long? = null
 )
 
 // ==========================================
@@ -94,3 +96,38 @@ data class ReviewEntity(
     val rating: Int, // 1 a 5 estrellas
     val date: String
 )
+
+// ==========================================
+// Entidad Room: Boxes de Atención Presencial
+// ==========================================
+@Entity(tableName = "boxes")
+data class BoxEntity(
+    @PrimaryKey val boxNumber: Int, // Boxes 1 a 8 en Los Vilos
+    val name: String = "Box $boxNumber",
+    val status: String = "disponible", // "disponible" o "reservado"
+    val description: String = "Box de atención presencial $boxNumber",
+    val currentAppointmentId: Long? = null // ID de la cita actualmente asignada
+)
+
+// ==========================================
+// Entidad Room: Turnos / Módulos de Atención
+// ==========================================
+@Entity(tableName = "turnos")
+data class TurnoEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String = "", // Formato yyyy-MM-dd
+    val timeSlot: String = "", // ej. "09:00 AM", "10:00 AM"
+    val professionalRun: String = "", // Asociación con UserEntity por RUN
+    val professionalName: String = "",
+    val serviceType: String = "",
+    val boxNumber: Int? = null, // Asociación con BoxEntity (1..8) si es presencial
+    val status: String = "disponible", // "disponible" o "reservado"
+    val isOnline: Boolean = false,
+    val appointmentId: Long? = null // Asociación con AppointmentEntity si está reservado
+)
+
+val BoxEntity.isReserved: Boolean
+    get() = status.equals("reservado", ignoreCase = true)
+
+val TurnoEntity.isReserved: Boolean
+    get() = status.equals("reservado", ignoreCase = true)

@@ -51,6 +51,7 @@ fun BookingScreen(
     val currentUser by userViewModel.currentUser.collectAsState()
     val dbProfessionals by userViewModel.professionals.collectAsState()
     val allAppointments by bookingViewModel.appointments.collectAsState()
+    val weather by bookingViewModel.weatherState.collectAsState()
     val state by bookingViewModel.uiState.collectAsState()
     val context = LocalContext.current
 
@@ -463,6 +464,33 @@ fun BookingScreen(
                     }
                 }
             )
+
+            // Indicador de consumo de API Externa (Pronóstico climático para atención en sede Los Vilos)
+            weather?.let { w ->
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.WbSunny,
+                            contentDescription = "Clima Los Vilos",
+                            tint = Color(0xFFF57C00),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Clima en Los Vilos: ${w.temperature}°C • Viento: ${w.windspeed} km/h (API Externa)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
 
             AnimatedVisibility(
                 visible = gpsGpsSuggestion != null,

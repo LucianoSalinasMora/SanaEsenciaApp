@@ -16,8 +16,10 @@ import androidx.room.TypeConverters
         ProductEntity::class,
         ReviewEntity::class,
         AboutInfoEntity::class,
+        BoxEntity::class,
+        TurnoEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -31,6 +33,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun productDao(): ProductDao
     abstract fun reviewDao(): ReviewDao
     abstract fun aboutDao(): AboutDao
+    abstract fun boxDao(): BoxDao
+    abstract fun turnoDao(): TurnoDao
 
     // ------------------------------------------
     // Patrón Singleton para la Instancia de la Base de Datos
@@ -38,6 +42,8 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        fun getInstance(): AppDatabase? = INSTANCE
 
         // Retorna la instancia única sincronizada de la base de datos
         fun getDatabase(context: Context): AppDatabase {
