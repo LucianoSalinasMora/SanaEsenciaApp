@@ -12,6 +12,7 @@ data class BookingFormState(
     // Selección de Servicio y Profesional
     val serviceType: String = "",
     val professionalName: String = "",
+    val professionalRun: String = "",
     // Fecha, Horario y Modalidad
     val date: String = "",
     val timeSlot: String = "",

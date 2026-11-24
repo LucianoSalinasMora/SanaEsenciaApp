@@ -115,15 +115,6 @@ fun NosotrosScreen(role: String = "PACIENTE") {
 
     var mostrarDialogoEditar by remember { mutableStateOf(false) }
 
-    // Reseñas de ejemplo (ficticias, solo en memoria). El admin puede eliminarlas.
-    val resenas = remember {
-        mutableStateListOf(
-            "Paciente 1" to "Excelente atención y un espacio muy acogedor.",
-            "Paciente 2" to "Pude agendar mi hora online sin complicaciones.",
-            "Paciente 3" to "Los profesionales explican todo con mucha claridad."
-        )
-    }
-
     val especialidades = listOf(
         "Psicología Infanto-Juvenil",
         "Psicología Adolescentes y Adultos",
@@ -339,58 +330,6 @@ fun NosotrosScreen(role: String = "PACIENTE") {
                     Text("Nuestras Especialidades", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     especialidades.forEach { esp ->
                         Text("• $esp", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
-        }
-
-        // Solo el administrador gestiona las reseñas
-        if (role == "ADMIN") {
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Gestión de Reseñas", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    "Reseñas publicadas por pacientes (puedes administrarlas o eliminarlas).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-
-            if (resenas.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Text(
-                            "No hay reseñas para mostrar.",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            } else {
-                itemsIndexed(resenas) { index, resena ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(resena.first, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                Text(resena.second, style = MaterialTheme.typography.bodyMedium)
-                            }
-                            IconButton(onClick = { resenas.removeAt(index) }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Eliminar reseña",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
                     }
                 }
             }

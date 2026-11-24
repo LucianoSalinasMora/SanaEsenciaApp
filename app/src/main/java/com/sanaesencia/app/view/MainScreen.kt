@@ -92,7 +92,7 @@ fun MainScreen(
             Screen.ManageProducts,     // Gestión de Productos y Novedades
             Screen.ManageSchedule,     // Gestión de Turnos Global
             Screen.AdminProfessionals, // Editar Profesionales
-            Screen.About               // Gestión de Reseñas
+            Screen.About               // Información del Centro (Nosotros)
         )
         UserRole.PROFESIONAL.name -> listOf(
             Screen.Inicio,             // Turnos del día
@@ -167,6 +167,25 @@ fun MainScreen(
                         }
                     }
 
+                    // Etiqueta de rol (Administrador o Profesional) al lado de cerrar sesión
+                    if (userRole.equals("ADMIN", ignoreCase = true) || userRole.equals("PROFESIONAL", ignoreCase = true)) {
+                        val roleTag = if (userRole.equals("ADMIN", ignoreCase = true)) "Administrador" else "Profesional"
+                        Surface(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                            tonalElevation = 2.dp,
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Text(
+                                text = roleTag,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
                     IconButton(onClick = { mostrarDialogoLogout = true }) {
                         Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Cerrar Sesión")
                     }
@@ -234,6 +253,7 @@ fun MainScreen(
             composable(Screen.Inicio.route) {
                 DashboardScreen(
                     viewModel = bookingViewModel,
+                    userViewModel = userViewModel,
                     role = userRole
                 )
             }
@@ -257,7 +277,8 @@ fun MainScreen(
             // Vistas de Profesional
             composable(Screen.MyPatients.route) {
                 MyPatientsScreen(
-                    bookingViewModel = bookingViewModel
+                    bookingViewModel = bookingViewModel,
+                    userViewModel = userViewModel
                 )
             }
             composable(Screen.MySchedule.route) { MyScheduleScreen(bookingViewModel = bookingViewModel, userViewModel = userViewModel) }

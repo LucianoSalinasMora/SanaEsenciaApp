@@ -56,6 +56,9 @@ interface AppointmentDao {
     @Query("SELECT * FROM appointments WHERE patientRun = :patientRun ORDER BY date DESC")
     fun getAppointmentsByPatient(patientRun: String): Flow<List<AppointmentEntity>>
 
+    @Query("SELECT * FROM appointments WHERE id = :id LIMIT 1")
+    suspend fun getAppointmentById(id: Long): AppointmentEntity?
+
     // ------------------------------------------
     // Actualización de Estados de Cita
     // ------------------------------------------
@@ -69,6 +72,10 @@ interface AppointmentDao {
     // Verificar si ya existe una cita activa para el profesional en esa fecha y horario
     @Query("SELECT COUNT(*) FROM appointments WHERE date = :date AND professionalName = :professionalName AND timeSlot = :timeSlot AND state != 'CANCELADA' AND status != 'CANCELADA' AND status != 'Cancelada'")
     suspend fun countConflictAppointments(date: String, professionalName: String, timeSlot: String): Int
+
+    // Verificar si el paciente ya tiene una cita activa en esa fecha y horario
+    @Query("SELECT COUNT(*) FROM appointments WHERE date = :date AND patientRun = :patientRun AND timeSlot = :timeSlot AND state != 'CANCELADA' AND status != 'CANCELADA' AND status != 'Cancelada'")
+    suspend fun countPatientConflictAppointments(date: String, patientRun: String, timeSlot: String): Int
 
     // ------------------------------------------
     // Control de Ocupación de Boxes Presenciales

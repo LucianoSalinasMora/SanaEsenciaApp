@@ -96,7 +96,14 @@ class AppointmentRepository(
 
             // Sincronización con backend microservicio Spring Boot (Offline-First)
             try {
-                RetrofitClient.backendApi.createAppointment(appointment.copy(id = insertedId).toDto())
+                val response = RetrofitClient.backendApi.createAppointment(appointment.copy(id = insertedId).toDto())
+                if (response.isSuccessful && response.body() != null) {
+                    val remoteId = response.body()!!.id
+                    if (remoteId > 0 && remoteId != insertedId) {
+                        appointmentDao.deleteAppointment(insertedId)
+                        appointmentDao.insertAppointment(appointment.copy(id = remoteId))
+                    }
+                }
             } catch (_: Exception) {
                 // Operación local en Room preservada exitosamente si no hay conexión externa
             }
@@ -112,6 +119,13 @@ class AppointmentRepository(
     // ------------------------------------------
     suspend fun isSlotTaken(date: String, professionalName: String, timeSlot: String): Boolean {
         return appointmentDao.countConflictAppointments(date, professionalName, timeSlot) > 0
+    }
+
+    suspend fun isPatientSlotTaken(date: String, patientRun: String, timeSlot: String): Boolean {
+        if (patientRun.isBlank()) return false
+        val clean = patientRun.replace(".", "").replace("-", "").uppercase()
+        return appointmentDao.countPatientConflictAppointments(date, patientRun, timeSlot) > 0 ||
+               appointmentDao.countPatientConflictAppointments(date, clean, timeSlot) > 0
     }
 
     // ------------------------------------------
@@ -137,15 +151,29 @@ class AppointmentRepository(
     // Cancelación y Eliminación de Citas
     // ------------------------------------------
     suspend fun cancelAppointment(id: Long) {
+        val appt = appointmentDao.getAppointmentById(id)
         appointmentDao.updateAppointmentState(id, "CANCELADA", "Cancelada")
         // Liberar box asociado a la cita
         resolvedBoxDao?.releaseBoxByAppointmentId(id)
         // Liberar turno asociado a la cita
         resolvedTurnoDao?.releaseTurnoByAppointmentId(id)
 
-        // Notificar al microservicio Spring Boot
+        // Sincronizar estado Cancelada con microservicio Spring Boot (Oracle DB)
         try {
-            RetrofitClient.backendApi.cancelAppointment(id)
+            val response = RetrofitClient.backendApi.cancelAppointment(id)
+            if (!response.isSuccessful && appt != null) {
+                val remoteList = RetrofitClient.backendApi.getAppointments()
+                if (remoteList.isSuccessful) {
+                    val match = remoteList.body()?.find { remote ->
+                        remote.status != "Cancelada" &&
+                        remote.date == formatToIsoDate(appt.date) &&
+                        remote.timeSlot == appt.timeSlot
+                    }
+                    if (match != null && match.id > 0) {
+                        RetrofitClient.backendApi.cancelAppointment(match.id)
+                    }
+                }
+            }
         } catch (_: Exception) {}
     }
 
@@ -177,14 +205,23 @@ class ProductRepository(private val productDao: ProductDao) {
     // ------------------------------------------
     suspend fun insertProduct(product: ProductEntity) {
         productDao.insertProduct(product)
+        try {
+            RetrofitClient.backendApi.createProduct(product.toDto())
+        } catch (_: Exception) {}
     }
 
     suspend fun updateProduct(product: ProductEntity) {
         productDao.updateProduct(product)
+        try {
+            RetrofitClient.backendApi.createProduct(product.toDto())
+        } catch (_: Exception) {}
     }
 
     suspend fun deleteProduct(product: ProductEntity) {
         productDao.deleteProduct(product)
+        try {
+            RetrofitClient.backendApi.deleteProduct(product.id)
+        } catch (_: Exception) {}
     }
 
     // ------------------------------------------
@@ -266,14 +303,36 @@ class UserRepository(private val userDao: UserDao) {
     // ------------------------------------------
     suspend fun insertUser(user: UserEntity) {
         userDao.insertUser(user)
+
+        // Sincronización con backend microservicio Spring Boot (Oracle Database)
+        try {
+            val response = RetrofitClient.backendApi.registerUser(user.toDto())
+            if (!response.isSuccessful) {
+                // Si ya existe en la BD Oracle, actualizar sus datos
+                RetrofitClient.backendApi.updateUser(user.run, user.toDto())
+            }
+        } catch (_: Exception) {
+            // Modo offline-first: queda guardado en Room si el backend está inaccesible
+        }
     }
 
     suspend fun updateUser(user: UserEntity) {
         userDao.updateUser(user)
+
+        // Sincronización de edición de perfil con backend (Oracle Database)
+        try {
+            RetrofitClient.backendApi.updateUser(user.run, user.toDto())
+        } catch (_: Exception) {
+            // Modo offline-first: queda guardado en Room si el backend está inaccesible
+        }
     }
 
     suspend fun deleteUser(run: String) {
         userDao.deleteUser(run)
+
+        try {
+            RetrofitClient.backendApi.deleteUser(run)
+        } catch (_: Exception) {}
     }
 
     // ------------------------------------------
@@ -290,8 +349,36 @@ class UserRepository(private val userDao: UserDao) {
 
         seedInitialData()
 
-        return userDao.login(cleanRun, password)
+        val localUser = userDao.login(cleanRun, password)
             ?: userDao.login(formattedRun, password)
+
+        if (localUser != null) {
+            return localUser
+        }
+
+        // Intento de autenticación con Backend Spring Boot (Oracle DB)
+        try {
+            val response = RetrofitClient.backendApi.login(LoginRequestDto(cleanRun, password))
+            if (response.isSuccessful && response.body()?.success == true) {
+                val remoteUser = response.body()?.user
+                if (remoteUser != null) {
+                    val entity = UserEntity(
+                        run = remoteUser.run,
+                        name = remoteUser.name,
+                        email = remoteUser.email,
+                        phone = remoteUser.phone,
+                        passwordHash = password,
+                        role = try { UserRole.valueOf(remoteUser.role.uppercase()) } catch (_: Exception) { UserRole.PACIENTE },
+                        specialty = remoteUser.specialty
+                    )
+                    userDao.insertUser(entity)
+                    return entity
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        return null
     }
 
     // ------------------------------------------

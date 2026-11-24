@@ -40,7 +40,8 @@ data class UserDto(
     val email: String = "",
     val phone: String = "",
     val role: String = "PACIENTE",
-    val specialty: String = ""
+    val specialty: String = "",
+    val password: String = ""
 )
 
 data class AppointmentDto(
@@ -126,6 +127,12 @@ interface SpringBootApiService {
     @GET("api/users/role/{role}")
     suspend fun getUsersByRole(@Path("role") role: String): Response<List<UserDto>>
 
+    @PUT("api/users/{run}")
+    suspend fun updateUser(@Path("run") run: String, @Body user: UserDto): Response<UserDto>
+
+    @DELETE("api/users/{run}")
+    suspend fun deleteUser(@Path("run") run: String): Response<Unit>
+
     // --- Endpoints de Citas Médicas ---
     @GET("api/appointments")
     suspend fun getAppointments(): Response<List<AppointmentDto>>
@@ -171,6 +178,16 @@ interface SpringBootApiService {
 
     @POST("api/products")
     suspend fun createProduct(@Body product: ProductDto): Response<ProductDto>
+
+    @DELETE("api/products/{id}")
+    suspend fun deleteProduct(@Path("id") id: Int): Response<Unit>
+
+    // --- Endpoints de Información Institucional (Nosotros) ---
+    @GET("api/about")
+    suspend fun getAboutInfo(): Response<AboutInfoDto>
+
+    @PUT("api/about")
+    suspend fun updateAboutInfo(@Body about: AboutInfoDto): Response<AboutInfoDto>
 }
 
 // ==========================================
@@ -220,16 +237,32 @@ object RetrofitClient {
 // ==========================================
 // 5. EXTENSIONES MAPPER (ENTITY <-> DTO)
 // ==========================================
+fun formatToIsoDate(rawDate: String): String {
+    val clean = rawDate.trim()
+    return try {
+        if (clean.matches(Regex("^\\d{4}-\\d{2}-\\d{2}$"))) {
+            clean
+        } else if (clean.matches(Regex("^\\d{2}/\\d{2}/\\d{4}$"))) {
+            val parts = clean.split("/")
+            "${parts[2]}-${parts[1]}-${parts[0]}"
+        } else {
+            clean
+        }
+    } catch (_: Exception) {
+        clean
+    }
+}
+
 fun AppointmentEntity.toDto(): AppointmentDto = AppointmentDto(
     id = id,
     patientName = patientName,
     patientEmail = patientEmail,
     patientPhone = patientPhone,
     patientRun = patientRun,
-    professionalRun = professionalRun,
+    professionalRun = professionalRun.ifBlank { "20000001-3" },
     serviceType = serviceType,
     professionalName = professionalName,
-    date = date,
+    date = formatToIsoDate(date),
     timeSlot = timeSlot,
     isOnline = isOnline,
     boxNumber = boxNumber,
@@ -298,4 +331,51 @@ fun TurnoDto.toEntity(): TurnoEntity = TurnoEntity(
     status = status,
     isOnline = isOnline,
     appointmentId = appointmentId
+)
+
+fun UserEntity.toDto(rawPassword: String = ""): UserDto = UserDto(
+    run = run,
+    name = name,
+    email = email,
+    phone = phone,
+    role = role.name,
+    specialty = specialty,
+    password = rawPassword.ifBlank { passwordHash }
+)
+
+data class AboutInfoDto(
+    val id: Int = 1,
+    val centerTitle: String = "",
+    val description: String = "",
+    val address: String = "",
+    val phone: String = "",
+    val email: String = ""
+)
+
+fun NosotrosInfo.toDto(): AboutInfoDto = AboutInfoDto(
+    id = 1,
+    centerTitle = title,
+    description = description,
+    address = address,
+    phone = phone,
+    email = email
+)
+
+fun AboutInfoDto.toNosotrosInfo(schedule: String = "Lunes a Viernes 09:00 - 19:00 hrs"): NosotrosInfo = NosotrosInfo(
+    title = centerTitle,
+    description = description,
+    address = address,
+    phone = phone,
+    email = email,
+    schedule = schedule
+)
+
+fun ProductEntity.toDto(): ProductDto = ProductDto(
+    id = id,
+    name = name,
+    description = description,
+    price = price,
+    isAvailable = isAvailable,
+    imageUrl = imageUrl,
+    stock = stock
 )

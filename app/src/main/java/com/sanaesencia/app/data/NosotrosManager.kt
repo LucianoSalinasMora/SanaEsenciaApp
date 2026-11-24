@@ -1,9 +1,12 @@
 package com.sanaesencia.app.data
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 // ==========================================
 // Modelo de Información Institucional "Nosotros"
@@ -58,6 +61,23 @@ object NosotrosManager {
                 schedule = prefs.getString(KEY_SCHEDULE, "Lunes a Viernes 09:00 - 19:00 hrs") ?: "Lunes a Viernes 09:00 - 19:00 hrs"
             )
             isInitialized = true
+
+            // Sincronizar desde backend Oracle DB si está disponible
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val response = RetrofitClient.backendApi.getAboutInfo()
+                    if (response.isSuccessful && response.body() != null) {
+                        val remote = response.body()!!
+                        _infoState.value = _infoState.value.copy(
+                            title = remote.centerTitle.ifBlank { _infoState.value.title },
+                            description = remote.description.ifBlank { _infoState.value.description },
+                            address = remote.address.ifBlank { _infoState.value.address },
+                            phone = remote.phone.ifBlank { _infoState.value.phone },
+                            email = remote.email.ifBlank { _infoState.value.email }
+                        )
+                    }
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -76,5 +96,12 @@ object NosotrosManager {
             .apply()
 
         _infoState.value = newInfo
+
+        // Sincronizar con Oracle DB mediante microservicio Spring Boot
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                RetrofitClient.backendApi.updateAboutInfo(newInfo.toDto())
+            } catch (_: Exception) {}
+        }
     }
 }

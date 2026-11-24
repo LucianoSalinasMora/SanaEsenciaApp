@@ -10,8 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.sanaesencia.app.data.AppointmentEntity
 import com.sanaesencia.app.data.isCancelled
 import com.sanaesencia.app.viewmodel.BookingViewModel
+import java.time.LocalDate
+import java.time.LocalTime
 
 // ==========================================
 // Pantalla de Gestión de Citas y Ocupación de Boxes (Administrador)
@@ -82,9 +85,9 @@ fun ManageScheduleScreen(bookingViewModel: BookingViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     (1..4).forEach { box ->
-                        val boxEntity = boxes.find { it.boxNumber == box }
                         val activeCount = activas.count { it.boxNumber == box }
-                        val status = if (activeCount > 0 || boxEntity?.status == "reservado") "reservado" else "disponible"
+                        val isOccupiedNow = isBoxOccupiedNow(box, activas)
+                        val status = if (isOccupiedNow) "reservado" else "disponible"
                         BoxCard(box, activeCount, status, Modifier.weight(1f))
                     }
                 }
@@ -93,9 +96,9 @@ fun ManageScheduleScreen(bookingViewModel: BookingViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     (5..8).forEach { box ->
-                        val boxEntity = boxes.find { it.boxNumber == box }
                         val activeCount = activas.count { it.boxNumber == box }
-                        val status = if (activeCount > 0 || boxEntity?.status == "reservado") "reservado" else "disponible"
+                        val isOccupiedNow = isBoxOccupiedNow(box, activas)
+                        val status = if (isOccupiedNow) "reservado" else "disponible"
                         BoxCard(box, activeCount, status, Modifier.weight(1f))
                     }
                 }
@@ -209,7 +212,7 @@ private fun BoxCard(
     status: String = "disponible",
     modifier: Modifier = Modifier
 ) {
-    val isReserved = status.equals("reservado", ignoreCase = true) || cantidad > 0
+    val isReserved = status.equals("reservado", ignoreCase = true)
     ElevatedCard(
         modifier = modifier,
         colors = if (isReserved) CardDefaults.elevatedCardColors(
@@ -243,5 +246,50 @@ private fun BoxCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+// ------------------------------------------
+// Verificación de Ocupación en Tiempo Real (Momento Actual)
+// ------------------------------------------
+private fun isBoxOccupiedNow(box: Int, activeAppointments: List<AppointmentEntity>): Boolean {
+    val today = LocalDate.now().toString() // yyyy-MM-dd
+    val now = LocalTime.now()
+
+    return activeAppointments.any { cita ->
+        if (cita.boxNumber != box || cita.isOnline || cita.isCancelled) return@any false
+
+        val cleanDate = cita.date.trim()
+        val isToday = if (cleanDate.contains("/")) {
+            val parts = cleanDate.split("/")
+            if (parts.size == 3) {
+                val isoDate = if (parts[0].length == 4) "${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}"
+                else "${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}"
+                isoDate == today
+            } else false
+        } else {
+            cleanDate == today
+        }
+        if (!isToday) return@any false
+
+        val start = parseSlotToTime(cita.timeSlot) ?: return@any false
+        val end = start.plusHours(1)
+        !now.isBefore(start) && now.isBefore(end)
+    }
+}
+
+private fun parseSlotToTime(slot: String): LocalTime? {
+    return try {
+        val clean = slot.trim()
+        val parts = clean.split(" ")
+        val timeParts = parts.getOrNull(0)?.split(":") ?: return null
+        var hour = timeParts.getOrNull(0)?.toIntOrNull() ?: return null
+        val minute = timeParts.getOrNull(1)?.toIntOrNull() ?: 0
+        val isPm = parts.getOrNull(1)?.equals("PM", ignoreCase = true) == true
+        if (isPm && hour in 1..11) hour += 12
+        else if (!isPm && hour == 12) hour = 0
+        LocalTime.of(hour.coerceIn(0, 23), minute.coerceIn(0, 59))
+    } catch (_: Exception) {
+        null
     }
 }

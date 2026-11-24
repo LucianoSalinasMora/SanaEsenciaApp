@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sanaesencia.app.data.formatDisplayDate
+import com.sanaesencia.app.data.isCancelled
 import com.sanaesencia.app.viewmodel.BookingViewModel
 import com.sanaesencia.app.viewmodel.UserViewModel
 import java.time.LocalDate
@@ -32,7 +33,16 @@ fun MyScheduleScreen(
 
     val hoy = LocalDate.now().toString() // formato yyyy-MM-dd, igual que las citas
     val proximas = allAppointments
-        .filter { it.professionalName == currentUser?.name && it.date >= hoy }
+        .filter { cita ->
+            val user = currentUser
+            if (user == null) false
+            else {
+                val cleanUserRun = user.run.replace(".", "").replace("-", "").uppercase()
+                val cleanProRun = cita.professionalRun.replace(".", "").replace("-", "").uppercase()
+                val matchPro = cleanProRun == cleanUserRun || cita.professionalName.equals(user.name, ignoreCase = true)
+                matchPro && !cita.isCancelled
+            }
+        }
         .sortedWith(compareBy({ it.date }, { it.timeSlot }))
 
     Column(

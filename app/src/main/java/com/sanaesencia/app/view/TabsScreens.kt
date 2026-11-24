@@ -47,10 +47,34 @@ import com.sanaesencia.app.viewmodel.UserViewModel
 @Composable
 fun DashboardScreen(
     viewModel: BookingViewModel,
+    userViewModel: UserViewModel? = null,
     role: String = "PACIENTE"
 ) {
     val context = LocalContext.current
-    val appointments by viewModel.appointments.collectAsState()
+    val currentUser by userViewModel?.currentUser?.collectAsState() ?: remember { mutableStateOf(null) }
+    val allAppointments by viewModel.appointments.collectAsState()
+
+    val appointments = remember(allAppointments, currentUser, role) {
+        val user = currentUser
+        if (user == null || role.equals("ADMIN", ignoreCase = true)) {
+            allAppointments
+        } else if (role.equals("PROFESIONAL", ignoreCase = true)) {
+            allAppointments.filter { cita ->
+                val cleanUserRun = user.run.replace(".", "").replace("-", "").uppercase()
+                val cleanProRun = cita.professionalRun.replace(".", "").replace("-", "").uppercase()
+                cleanProRun == cleanUserRun || cita.professionalName.equals(user.name, ignoreCase = true)
+            }
+        } else {
+            // PACIENTE: solo ver SUS citas
+            allAppointments.filter { cita ->
+                val cleanUserRun = user.run.replace(".", "").replace("-", "").uppercase()
+                val cleanPatientRun = cita.patientRun.replace(".", "").replace("-", "").uppercase()
+                val matchRun = cleanPatientRun.isNotBlank() && cleanPatientRun == cleanUserRun
+                val matchName = cita.patientName.isNotBlank() && cita.patientName.equals(user.name, ignoreCase = true)
+                matchRun || matchName
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -59,22 +83,52 @@ fun DashboardScreen(
         contentPadding = PaddingValues(bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        val headerTitle = when (role.uppercase()) {
+            "ADMIN" -> "Panel de Administración"
+            "PROFESIONAL" -> "Panel del Profesional"
+            else -> "Inicio y Novedades"
+        }
+
+        val welcomeCardTitle = when (role.uppercase()) {
+            "ADMIN" -> "¡Bienvenido, Administrador!"
+            "PROFESIONAL" -> "¡Bienvenido, ${currentUser?.name ?: "Profesional"}!"
+            else -> "¡Bienvenido a Centro Sanaesencia!"
+        }
+
+        val welcomeCardDesc = when (role.uppercase()) {
+            "ADMIN" -> "Supervisa la ocupación de los boxes de atención, administra las citas globales y gestiona al equipo del centro."
+            "PROFESIONAL" -> "Consulta tus citas asignadas, revisa el contexto clínico de tus pacientes y administra tus turnos."
+            else -> "Explora nuestras especialidades, agenda horas médicas presenciales en Los Vilos u online, e infórmate de nuestras novedades."
+        }
+
+        val appointmentsTitle = when (role.uppercase()) {
+            "ADMIN" -> "Todas las Citas del Centro"
+            "PROFESIONAL" -> "Tus Citas Asignadas"
+            else -> "Tus Próximas Citas Agendadas"
+        }
+
+        val emptyText = when (role.uppercase()) {
+            "ADMIN" -> "No hay citas registradas en el sistema actualmente."
+            "PROFESIONAL" -> "No tienes citas agendadas con pacientes en este momento."
+            else -> "No tienes citas agendadas aún. Presiona el botón '+' para reservar una hora."
+        }
+
         item {
-            Text("Inicio y Novedades", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+            Text(headerTitle, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
         }
 
         item {
             ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("¡Bienvenido a Centro Sanaesencia!", style = MaterialTheme.typography.titleMedium)
+                    Text(welcomeCardTitle, style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Explora nuestras especialidades, agenda horas médicas presenciales en Los Vilos u online, e infórmate de nuestras novedades.")
+                    Text(welcomeCardDesc)
                 }
             }
         }
 
         item {
-            Text("Tus Próximas Citas Agendadas", style = MaterialTheme.typography.titleLarge)
+            Text(appointmentsTitle, style = MaterialTheme.typography.titleLarge)
         }
 
         if (appointments.isEmpty()) {
@@ -84,7 +138,7 @@ fun DashboardScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Text(
-                        text = "No tienes citas agendadas aún. Presiona el botón '+' para reservar una hora.",
+                        text = emptyText,
                         modifier = Modifier.padding(16.dp),
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -116,6 +170,20 @@ fun ProfileScreen(
     val context = LocalContext.current
     val currentUser by userViewModel.currentUser.collectAsState()
     val appointments by bookingViewModel.appointments.collectAsState()
+
+    val patientAppointments = remember(appointments, currentUser) {
+        val user = currentUser
+        if (user == null) emptyList()
+        else {
+            appointments.filter { cita ->
+                val cleanUserRun = user.run.replace(".", "").replace("-", "").uppercase()
+                val cleanPatientRun = cita.patientRun.replace(".", "").replace("-", "").uppercase()
+                val matchRun = cleanPatientRun.isNotBlank() && cleanPatientRun == cleanUserRun
+                val matchName = cita.patientName.isNotBlank() && cita.patientName.equals(user.name, ignoreCase = true)
+                matchRun || matchName
+            }
+        }
+    }
 
     var isEditing by remember { mutableStateOf(false) }
     var name by remember(currentUser) { mutableStateOf(currentUser?.name ?: "") }
@@ -229,12 +297,12 @@ fun ProfileScreen(
             Text("Historial de Citas Registradas", style = MaterialTheme.typography.titleLarge)
         }
 
-        if (appointments.isEmpty()) {
+        if (patientAppointments.isEmpty()) {
             item {
                 Text("No hay registros de citas guardadas.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
             }
         } else {
-            items(appointments) { appointment ->
+            items(patientAppointments) { appointment ->
                 AppointmentCard(
                     appointment = appointment,
                     onCancel = {

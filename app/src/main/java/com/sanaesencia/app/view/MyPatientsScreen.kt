@@ -14,16 +14,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sanaesencia.app.viewmodel.BookingViewModel
+import com.sanaesencia.app.viewmodel.UserViewModel
 
 // ==========================================
 // Pantalla de Pacientes Agendados (Vista Profesional)
 // ==========================================
 @Composable
-fun MyPatientsScreen(bookingViewModel: BookingViewModel) {
+fun MyPatientsScreen(
+    bookingViewModel: BookingViewModel,
+    userViewModel: UserViewModel? = null
+) {
     // ------------------------------------------
-    // Observación de Citas de Pacientes
+    // Observación de Citas de Pacientes asignadas al Profesional
     // ------------------------------------------
     val appointments by bookingViewModel.appointments.collectAsState()
+    val currentUser by userViewModel?.currentUser?.collectAsState() ?: remember { mutableStateOf(null) }
+
+    val myAppointments = remember(appointments, currentUser) {
+        val user = currentUser
+        if (user == null) {
+            appointments
+        } else {
+            appointments.filter { cita ->
+                val cleanUserRun = user.run.replace(".", "").replace("-", "").uppercase()
+                val cleanProRun = cita.professionalRun.replace(".", "").replace("-", "").uppercase()
+                cleanProRun == cleanUserRun || cita.professionalName.equals(user.name, ignoreCase = true)
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -43,13 +61,13 @@ fun MyPatientsScreen(bookingViewModel: BookingViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (appointments.isEmpty()) {
+        if (myAppointments.isEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Text(
-                    text = "No hay pacientes agendados actualmente.",
+                    text = "No tiene pacientes agendados actualmente.",
                     modifier = Modifier.padding(16.dp),
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -59,7 +77,7 @@ fun MyPatientsScreen(bookingViewModel: BookingViewModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(appointments) { appointment ->
+                items(myAppointments) { appointment ->
                     AppointmentCard(
                         appointment = appointment,
                         onCancel = { bookingViewModel.cancelAppointment(appointment.id) }

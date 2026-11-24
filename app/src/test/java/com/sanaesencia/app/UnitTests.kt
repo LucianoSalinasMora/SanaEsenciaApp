@@ -108,7 +108,7 @@ class DateFormatUnitTest {
     @Test
     fun testFormatDisplayDateEmptyOrInvalid() {
         assertEquals("", formatDisplayDate(""))
-        assertEquals("   ", formatDisplayDate("   ").trim())
+        assertEquals("", formatDisplayDate("   "))
         assertEquals("texto-plano", formatDisplayDate("texto-plano"))
     }
 }
@@ -299,6 +299,64 @@ class NetworkDtoMappingUnitTest {
 
         val mappedBack = dto.toEntity()
         assertEquals(turno, mappedBack)
+    }
+
+    @Test
+    fun testUserEntityToDto() {
+        val user = UserEntity(
+            run = "20000001-3",
+            name = "Dra. Keilen Sánchez Ríos",
+            email = "keilen.sanchez@sanaesencia.cl",
+            phone = "+56923665073",
+            passwordHash = "hashedPassword123",
+            role = UserRole.PROFESIONAL,
+            specialty = "Medicina General"
+        )
+        val dto = user.toDto()
+        assertEquals("20000001-3", dto.run)
+        assertEquals("Dra. Keilen Sánchez Ríos", dto.name)
+        assertEquals("PROFESIONAL", dto.role)
+        assertEquals("Medicina General", dto.specialty)
+        assertEquals("hashedPassword123", dto.password)
+    }
+
+    @Test
+    fun testProductEntityToDto() {
+        val product = ProductEntity(
+            id = 5,
+            name = "Aceite de Lavanda",
+            description = "Esencia relajante 30ml",
+            price = 9990.0,
+            stock = 12,
+            isAvailable = true
+        )
+        val dto = product.toDto()
+        assertEquals(5, dto.id)
+        assertEquals("Aceite de Lavanda", dto.name)
+        assertEquals(9990.0, dto.price, 0.001)
+        assertEquals(12, dto.stock)
+        assertTrue(dto.isAvailable)
+    }
+
+    @Test
+    fun testNosotrosInfoToDtoAndBack() {
+        val info = NosotrosInfo(
+            title = "Centro de Salud Integral SanaEsencia",
+            description = "Centro multidisciplinario en Los Vilos",
+            address = "Caupolicán 220, Los Vilos",
+            phone = "+56923665073",
+            email = "contacto@centrosanaesencia.cl",
+            schedule = "Lunes a Viernes 09:00 - 19:00 hrs"
+        )
+        val dto = info.toDto()
+        assertEquals("Centro de Salud Integral SanaEsencia", dto.centerTitle)
+        assertEquals("Caupolicán 220, Los Vilos", dto.address)
+
+        val mappedBack = dto.toNosotrosInfo()
+        assertEquals(info.title, mappedBack.title)
+        assertEquals(info.address, mappedBack.address)
+        assertEquals(info.phone, mappedBack.phone)
+        assertEquals(info.email, mappedBack.email)
     }
 }
 

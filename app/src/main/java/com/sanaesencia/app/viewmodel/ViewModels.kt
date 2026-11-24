@@ -177,7 +177,8 @@ class BookingViewModel(private val repository: AppointmentRepository) : ViewMode
     }
 
     fun onProfessionalChanged(professional: String, dbProfessionals: List<UserEntity> = emptyList()) {
-        _uiState.update { it.copy(professionalName = professional, errorMessage = null) }
+        val proRun = dbProfessionals.find { it.name.equals(professional.trim(), ignoreCase = true) }?.run ?: ""
+        _uiState.update { it.copy(professionalName = professional, professionalRun = proRun, errorMessage = null) }
         validateForm(dbProfessionals)
     }
 
@@ -267,7 +268,7 @@ class BookingViewModel(private val repository: AppointmentRepository) : ViewMode
         viewModelScope.launch {
             val state = _uiState.value
 
-            // 1. Validar directamente en SQLite Room que el horario no esté tomado
+            // 1. Validar directamente en SQLite Room que el horario no esté tomado con el profesional
             val alreadyTaken = repository.isSlotTaken(
                 date = state.date.trim(),
                 professionalName = state.professionalName.trim(),
@@ -278,16 +279,34 @@ class BookingViewModel(private val repository: AppointmentRepository) : ViewMode
                 return@launch
             }
 
-            // 2. Para modalidad presencial, buscar un box libre (1..8) para evitar colisiones de sala
+            // 2. Validar que el paciente no tenga ya otra cita en este mismo bloque
+            val patientTaken = repository.isPatientSlotTaken(
+                date = state.date.trim(),
+                patientRun = state.patientRun.trim(),
+                timeSlot = state.timeSlot.trim()
+            )
+            if (patientTaken) {
+                onError?.invoke("Ya tienes una cita reservada en este mismo horario.")
+                return@launch
+            }
+
+            // 3. Para modalidad presencial, buscar un box libre (1..8) para evitar colisiones de sala
             val occupiedBoxes = repository.getOccupiedBoxes(state.date.trim(), state.timeSlot.trim())
             val freeBoxes = (1..8).filter { it !in occupiedBoxes }
-            val assignedBox = if (state.isOnline) null else (freeBoxes.firstOrNull() ?: (1..8).random())
+            if (!state.isOnline && freeBoxes.isEmpty()) {
+                onError?.invoke("No hay boxes de atención disponibles en ese horario. Por favor elija otro horario u opción online.")
+                return@launch
+            }
+            val assignedBox = if (state.isOnline) null else freeBoxes.first()
+
+            val proRun = state.professionalRun.ifBlank { "20000001-3" }
 
             val entity = AppointmentEntity(
                 patientName = state.patientName.ifBlank { "Paciente Registrado" },
                 patientEmail = state.patientEmail,
                 patientPhone = state.patientPhone,
                 patientRun = state.patientRun,
+                professionalRun = proRun,
                 serviceType = state.serviceType,
                 professionalName = state.professionalName,
                 date = state.date,
